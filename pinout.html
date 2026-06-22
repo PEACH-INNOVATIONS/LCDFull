@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LCDFull ESP32-S3 Pinout</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11pt; margin: 20mm; color: #000; }
+  h1   { font-size: 16pt; margin-bottom: 4px; }
+  h2   { font-size: 12pt; margin-top: 18px; margin-bottom: 4px; border-bottom: 1px solid #000; }
+  p    { margin: 4px 0; font-size: 10pt; color: #333; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+  th   { background: #222; color: #fff; text-align: left; padding: 5px 8px; font-size: 10pt; }
+  td   { padding: 4px 8px; font-size: 10pt; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) td { background: #f5f5f5; }
+  .moved  { color: #007; font-weight: bold; }
+  .psram  { color: #a00; font-style: italic; }
+  .note   { background: #fffbe6; border-left: 3px solid #f0a000; padding: 6px 10px;
+            margin-top: 10px; font-size: 10pt; }
+  .free   { color: #060; }
+  .avoid  { color: #c00; }
+  @media print { body { margin: 10mm; } }
+</style>
+</head>
+<body>
+
+<h1>LCDFull — ESP32-S3 Pinout</h1>
+<p>Board: ESP32-S3-DevKitC-1 &nbsp;|&nbsp; Module: ESP32-S3-WROOM-1<strong>U-P1N8R2</strong> (8 MB flash, 2 MB Quad PSRAM, external antenna)</p>
+
+<h2>LCD Panel — JD9165A 800×480 8-bit Parallel RGB</h2>
+<table>
+  <tr><th>GPIO</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>6</td><td>LCD D0</td><td></td></tr>
+  <tr><td>7</td><td>LCD D1</td><td></td></tr>
+  <tr><td>18</td><td>LCD D2</td><td></td></tr>
+  <tr><td>8</td><td>LCD D3</td><td></td></tr>
+  <tr><td>10</td><td>LCD D4</td><td></td></tr>
+  <tr><td>11</td><td>LCD D5</td><td></td></tr>
+  <tr><td>12</td><td>LCD D6</td><td></td></tr>
+  <tr><td>13</td><td>LCD D7</td><td></td></tr>
+  <tr><td>9</td><td>LCD PCLK</td><td>16 MHz pixel clock</td></tr>
+  <tr><td>14</td><td>LCD HSYNC</td><td></td></tr>
+  <tr><td>17</td><td>LCD VSYNC</td><td></td></tr>
+  <tr><td>21</td><td>LCD DE</td><td>Data enable — active pixel signal (DE-mode panel)</td></tr>
+  <tr><td>39</td><td>LCD DISP</td><td>Panel on/off</td></tr>
+  <tr><td>38</td><td>Backlight PWM</td><td>LEDC channel 0, 5 kHz, starts 80 %</td></tr>
+</table>
+
+<h2>Touch Controller — HY4633 (FT6206-compatible) I2C</h2>
+<table>
+  <tr><th>GPIO</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>1</td><td>I2C SCL</td><td>Shared with MCP23017</td></tr>
+  <tr><td>2</td><td>I2C SDA</td><td>Shared with MCP23017</td></tr>
+  <tr><td>5</td><td>Touch INT</td><td>I2C address 0x38</td></tr>
+</table>
+
+<h2>Hardware Buttons — MCP23017 I2C GPIO Expander</h2>
+<table>
+  <tr><th>GPIO</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>1</td><td>I2C SCL</td><td>Shared with touch controller</td></tr>
+  <tr><td>2</td><td>I2C SDA</td><td>Shared with touch controller</td></tr>
+  <tr><td>4</td><td>MCP23017 INT</td><td>I2C address 0x20, falling edge, active-low buttons on bits 0–3</td></tr>
+</table>
+<p>Button mapping: bit 0 = Left (&lt;) &nbsp;|&nbsp; bit 1 = R− &nbsp;|&nbsp; bit 2 = R+ &nbsp;|&nbsp; bit 3 = Right (&gt;/Confirm)</p>
+
+<h2>UART — Coach Radio Link</h2>
+<table>
+  <tr><th>GPIO</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>15</td><td>UART2 TX</td><td rowspan="2">460800 baud, 8N1, no flow control</td></tr>
+  <tr><td>16</td><td>UART2 RX</td></tr>
+</table>
+
+<h2>SD Card — SPI</h2>
+<table>
+  <tr><th>GPIO</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>40</td><td>SD MOSI</td><td></td></tr>
+  <tr><td>41</td><td>SD SCLK</td><td></td></tr>
+  <tr><td>42</td><td>SD MISO</td><td></td></tr>
+  <tr><td>47</td><td>SD CS</td><td>Mount point: /sdcard &nbsp;|&nbsp; Config file: cdispcnf.txt</td></tr>
+</table>
+
+<h2>Summary — All Assigned Pins</h2>
+<table>
+  <tr><th>GPIO</th><th>Function</th><th>Notes</th></tr>
+  <tr><td>1</td><td>I2C SCL</td><td>Touch + MCP23017</td></tr>
+  <tr><td>2</td><td>I2C SDA</td><td>Touch + MCP23017</td></tr>
+  <tr><td>4</td><td>MCP23017 INT</td><td></td></tr>
+  <tr><td>5</td><td>Touch INT</td><td></td></tr>
+  <tr><td>6</td><td>LCD D0</td><td></td></tr>
+  <tr><td>7</td><td>LCD D1</td><td></td></tr>
+  <tr><td>8</td><td>LCD D3</td><td></td></tr>
+  <tr><td>9</td><td>LCD PCLK</td><td></td></tr>
+  <tr><td>10</td><td>LCD D4</td><td></td></tr>
+  <tr><td>11</td><td>LCD D5</td><td></td></tr>
+  <tr><td>12</td><td>LCD D6</td><td></td></tr>
+  <tr><td>13</td><td>LCD D7</td><td></td></tr>
+  <tr><td>14</td><td>LCD HSYNC</td><td></td></tr>
+  <tr><td>15</td><td>UART2 TX</td><td></td></tr>
+  <tr><td>16</td><td>UART2 RX</td><td></td></tr>
+  <tr><td>17</td><td>LCD VSYNC</td><td></td></tr>
+  <tr><td>18</td><td>LCD D2</td><td></td></tr>
+  <tr><td>21</td><td>LCD DE</td><td></td></tr>
+  <tr><td>38</td><td>Backlight PWM</td><td>LEDC ch0, 5 kHz</td></tr>
+  <tr><td>39</td><td>LCD DISP</td><td></td></tr>
+  <tr><td>40</td><td>SD MOSI</td><td></td></tr>
+  <tr><td>41</td><td>SD SCLK</td><td></td></tr>
+  <tr><td>42</td><td>SD MISO</td><td></td></tr>
+  <tr><td>47</td><td>SD CS</td><td></td></tr>
+</table>
+
+<h2>Free Pins</h2>
+<p class="free">Available after all assignments: 3</p>
+<p class="avoid">Avoid: 19/20 (USB D−/D+) &nbsp;|&nbsp; 43/44 (UART0 console) &nbsp;|&nbsp; 45/46 (strapping pins) &nbsp;|&nbsp; 48 (onboard RGB LED)</p>
+
+</body>
+</html>

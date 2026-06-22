@@ -1,0 +1,25 @@
+idf_component_register(
+    SRCS
+        "GraphConfig.c"
+        "GuiLvgl.c"
+        "BoatSelectLvgl.c"
+        "ForceAngleLvgl.c"
+        "HandleSpeedLvgl.c"
+        "PowerLvgl.c"
+        "ArcLengthLvgl.c"
+        "AccelTimeLvgl.c"
+        "AngleTimeLvgl.c"
+        "CalibLvgl.c"
+    INCLUDE_DIRS
+        "."
+        "include"
+        "../../Display"
+        "../../PacketParser"
+        "../../PeachAdminMessages"
+        "../../FileSystem"
+        "../../main"
+    REQUIRES
+        LCD
+        lvgl__lvgl
+        fatfs
+)

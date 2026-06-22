@@ -1,0 +1,49 @@
+CONFIG_IDF_TARGET="esp32s3"
+
+# PSRAM — two hardware configs are supported; uncomment the active one.
+#
+# N8R2 (current): 8 MB flash, 2 MB Quad SPI PSRAM — bandwidth-limited at 40 MB/s;
+#   DMA consumes ~28 % of that, leaving little headroom → intermittent display flicker.
+#CONFIG_SPIRAM=y
+#CONFIG_SPIRAM_MODE_QUAD=y
+#CONFIG_SPIRAM_SPEED_80M=y
+#
+# N16R8 (target): 16 MB flash, 8 MB Octal SPI PSRAM — 80 MB/s; DMA uses 14 % → no flicker.
+# NOTE: IDF 5.1.x OPI PSRAM init does a quad-mode ID read at the configured speed
+# before switching to OPI.  At 80 MHz this read is timing-marginal on the N16R8
+# and returns 0x00ffffff (no response) → abort.  40 MHz is reliable with IDF 5.1.x;
+# upgrade to IDF 5.3+ to run at 80 MHz.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+#
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+# Allow EXT_RAM_BSS_ATTR to place static arrays in PSRAM BSS
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+# Move instruction/rodata fetches to PSRAM so flash-SPI bus doesn't compete
+# with the LCD RGB DMA — eliminates periodic display glitches (ESP-FAQ fix)
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+# FreeRTOS: 1 kHz tick so LVGL ms timers stay accurate
+CONFIG_FREERTOS_HZ=1000
+
+# Larger main stack
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# RGB panel: restart DMA at every vsync to prevent row-drift
+CONFIG_LCD_RGB_RESTART_IN_VSYNC=y
+
+# Flash: 16 MB, 80 MHz QIO  (N16R8 has 16 MB flash — was 8 MB, caused memory-map mismatch)
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# LVGL fonts and memory
+CONFIG_LV_FONT_MONTSERRAT_24=y
+CONFIG_LV_FONT_MONTSERRAT_48=y
+CONFIG_LV_MEM_SIZE_KILOBYTES=128
+
+# Dark theme to match sim
+CONFIG_LV_THEME_DEFAULT_DARK=y
