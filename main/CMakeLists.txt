@@ -15,6 +15,7 @@ idf_component_register(
         "../FileSystem/FileSystemSD.c"
         "../BasicGraph/BasicGraph.c"
         "../Hardware/Esp32/UartHW.c"
+        "../SpiSlaveLink/SpiSlaveLink.c"
         "../WiFiManager/WiFiManager.c"
         "../OtaManager/OtaManager.c"
     INCLUDE_DIRS
@@ -26,6 +27,7 @@ idf_component_register(
         "../Hardware"
         "../Hardware/Esp32"
         "../PeachAdminMessages"
+        "../SpiSlaveLink"
         "../WiFiManager"
         "../OtaManager"
     REQUIRES
