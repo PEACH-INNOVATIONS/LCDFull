@@ -56,6 +56,8 @@ uint32_t xTaskGetTickCount(void)
 /* ================================================================
  * FileConfig stubs — return safe default values
  * ================================================================ */
+bool GetCRReady(void) { return true; }  /* sim: CR always considered ready */
+
 bool InitFileConfig(void)  { return true; }
 bool ParseConfigFile(char *p) { (void)p; return false; }
 bool IsConfigParamSet(eConfigParameterName p) { (void)p; return false; }

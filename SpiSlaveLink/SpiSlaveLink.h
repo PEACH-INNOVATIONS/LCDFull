@@ -11,12 +11,14 @@
  *   MISO out : GPIO42  (shared with SD card)
  *   SCLK in  : GPIO41  (shared with SD card)
  *
- * Frame format (260 bytes, full-duplex — same layout in both directions):
+ * Frame format (264 bytes, full-duplex — same layout in both directions):
  *   [0]     Magic  0xA5
  *   [1]     Flags  0x00 (reserved)
  *   [2-3]   Length big-endian (bytes of valid payload; 0 = no message)
  *   [4-259] Payload: raw Peach message bytes (LoggerID + packet body)
- *             zero-padded to fill the frame
+ *             zero-padded to fill the payload area
+ *   [260-263] Padding zeros — keeps the frame a multiple of 8 bytes so the
+ *             NRC7394 SPI DMA never processes a partial 8-byte burst
  *
  * No sync bytes, no STX/ETX — SPI CS assertion provides frame boundaries.
  */
@@ -34,7 +36,9 @@
 #define SPI_LINK_CD_INT_GPIO  GPIO_NUM_46   /* interrupt output to CR        */
 
 /* ── Frame geometry ─────────────────────────────────────────────────────── */
-#define SPI_LINK_FRAME_SIZE   260           /* total bytes per transaction    */
+/* 264 = 33 × 8: must be a multiple of 8 for the NRC7394 SPI DMA engine.
+ * Bytes 260-263 are zero padding; payload occupies bytes 4-259 as before. */
+#define SPI_LINK_FRAME_SIZE   264           /* total bytes per transaction    */
 #define SPI_LINK_PAYLOAD_MAX  256           /* usable payload bytes (4..259)  */
 #define SPI_LINK_FRAME_MAGIC  0xA5u
 
@@ -61,12 +65,13 @@ bool SpiSlaveLink_Init(void);
  * SpiSlaveLink_Transmit — enqueue a payload to send to the CR on the next
  * SPI transaction.  len must be <= SPI_LINK_PAYLOAD_MAX.
  *
- * Raises the INT line immediately so the CR knows data is waiting.
+ * INT is raised by the slave_task after the DMA is armed, not here.
  * Thread-safe; may be called from any task.
  *
  * Returns true if the message was accepted into the TX queue.
  */
 bool SpiSlaveLink_Transmit(const uint8_t *payload, uint16_t len);
+bool SpiSlaveLink_Transmit_with_LoggerID(const uint8_t *payload, uint16_t len,uint16_t destLoggerID);
 
 /*
  * SpiSlaveLink_GetRxQueue — returns the FreeRTOS queue on which

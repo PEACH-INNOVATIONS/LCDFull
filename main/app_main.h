@@ -5,6 +5,8 @@
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 
+#define CD_DATA_TRANSFER_SPI
+
 #define TARGET_PLATFORM_ESP32_CYD  0
 #define TARGET_PLATFORM_ESP32_S3   1
 #define TARGET_PLATFORM  TARGET_PLATFORM_ESP32_S3

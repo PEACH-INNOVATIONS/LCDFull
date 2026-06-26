@@ -65,8 +65,8 @@ trap cleanup EXIT INT TERM
 
 need_socat() {
     if ! command -v socat &>/dev/null; then
-        echo "[run_sim] ERROR: 'socat' not found — install with: sudo apt install socat"
-        exit 1
+        echo "[run_sim] socat not found — installing…"
+        sudo apt install -y socat
     fi
 }
 

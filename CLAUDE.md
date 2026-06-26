@@ -71,8 +71,8 @@ CPU-copy in the flush callback makes PSRAM valid here (no DMA constraint).
 ### idf.py is not on PATH by default
 Always source the IDF environment first:
 ```bash
-bash -c "source /home/joe/esp/v5.5.1/esp-idf/export.sh && idf.py build"
-bash -c "source /home/joe/esp/v5.5.1/esp-idf/export.sh && idf.py -p /dev/ttyACM0 flash"
+bash -c "source /home/joe/esp/v5.3/esp-idf/export.sh && idf.py build"
+bash -c "source /home/joe/esp/v5.3/esp-idf/export.sh && idf.py -p /dev/ttyACM0 flash"
 ```
 
 ### IDF_TARGET must be in CMakeLists.txt

@@ -16,6 +16,7 @@ idf_component_register(
         "../BasicGraph/BasicGraph.c"
         "../Hardware/Esp32/UartHW.c"
         "../SpiSlaveLink/SpiSlaveLink.c"
+        "../DebugConsole/DebugConsole.c"
         "../WiFiManager/WiFiManager.c"
         "../OtaManager/OtaManager.c"
     INCLUDE_DIRS
@@ -28,6 +29,7 @@ idf_component_register(
         "../Hardware/Esp32"
         "../PeachAdminMessages"
         "../SpiSlaveLink"
+        "../DebugConsole"
         "../WiFiManager"
         "../OtaManager"
     REQUIRES
@@ -41,6 +43,7 @@ idf_component_register(
         mqtt
         esp_https_ota
         esp_http_client
+        console
         esp_lcd
         driver
 )

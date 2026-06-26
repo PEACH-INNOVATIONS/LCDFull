@@ -1,4 +1,5 @@
 #include "SpiSlaveLink.h"
+#include "DebugConsole.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "app_main.h"     /* SD_CARD_PIN_MOSI/MISO/SCLK */
+#include "SerUtils.h"
 
 /* ── Internal constants ─────────────────────────────────────────────────── */
 
@@ -34,6 +36,8 @@
  */
 static uint8_t s_tx_frame[SPI_LINK_FRAME_SIZE] __attribute__((aligned(4)));
 static uint8_t s_rx_frame[SPI_LINK_FRAME_SIZE] __attribute__((aligned(4)));
+/* Completed RX is copied here so the DMA can be re-armed before processing. */
+static uint8_t s_rx_copy[SPI_LINK_FRAME_SIZE]  __attribute__((aligned(4)));
 
 static QueueHandle_t s_rx_queue = NULL;
 static QueueHandle_t s_tx_queue = NULL;
@@ -45,9 +49,19 @@ static QueueHandle_t s_tx_queue = NULL;
  */
 static bool s_queued_frame_has_data = false;
 
+/*
+ * True while a transaction is queued in the slave DMA (between
+ * spi_slave_queue_trans() and spi_slave_get_trans_result() returning).
+ * SpiSlaveLink_Transmit() checks this flag after queuing a message: if the
+ * DMA is already armed it calls update_int() immediately so the CR sees INT
+ * go high without waiting for the next loop iteration.  Must be set BEFORE
+ * update_int() in slave_task so that any concurrent Transmit() call that
+ * misses update_int() but sees the flag will still raise INT.
+ */
+static volatile bool s_dma_armed = false;
+
 /* ── INT line helpers ───────────────────────────────────────────────────── */
 
-static void int_assert(void)   { gpio_set_level(SPI_LINK_CD_INT_GPIO, 1); }
 static void int_deassert(void) { gpio_set_level(SPI_LINK_CD_INT_GPIO, 0); }
 
 /*
@@ -98,18 +112,30 @@ static void build_tx_frame(void)
 /*
  * Validate and post the received RX frame to the RX queue.
  */
-static void process_rx_frame(void)
+static void process_rx_frame(const uint8_t *frame)
 {
-    if (s_rx_frame[FRAME_OFF_MAGIC] != SPI_LINK_FRAME_MAGIC) return;
+    if (frame[FRAME_OFF_MAGIC] != SPI_LINK_FRAME_MAGIC) {
+        printf("SpiSlaveLink: bad magic 0x%02X (expected 0xA5)\n",
+               frame[FRAME_OFF_MAGIC]);
+        return;
+    }
 
-    uint16_t len = ((uint16_t)s_rx_frame[FRAME_OFF_LEN_H] << 8) |
-                    (uint16_t)s_rx_frame[FRAME_OFF_LEN_L];
+    uint16_t len = ((uint16_t)frame[FRAME_OFF_LEN_H] << 8) |
+                    (uint16_t)frame[FRAME_OFF_LEN_L];
 
     if (len == 0 || len > SPI_LINK_PAYLOAD_MAX) return;
 
     SpiLinkMsg_t msg;
     msg.len = len;
-    memcpy(msg.data, &s_rx_frame[FRAME_OFF_PAYLOAD], len);
+    memcpy(msg.data, &frame[FRAME_OFF_PAYLOAD], len);
+
+#if 0
+    DBG("process_rx_frame msg rxed\r\n");
+    if (g_debug_verbose) {
+        for(uint8_t i = 0;i < len;i++) printf("%02X ",msg.data[i]);
+        printf("\r\n");
+    }
+#endif
 
     /* Drop silently if RX queue is full — caller responsible for draining */
     xQueueSend(s_rx_queue, &msg, 0);
@@ -121,43 +147,57 @@ static void slave_task(void *arg)
 {
     (void)arg;
 
-    spi_slave_transaction_t trans;
+    spi_slave_transaction_t  trans;
+    spi_slave_transaction_t *completed;
+    bool has_prev_rx = false;
 
     for (;;) {
-        /*
-         * 1. Build the next TX frame and refresh the INT line.
-         *    INT stays high while either s_queued_frame_has_data OR the
-         *    TX queue still has messages.
-         */
+        /* 1. Build the next TX frame. */
         build_tx_frame();
-        update_int();
 
-        /*
-         * 2. Arm the transaction and block until the CR asserts CS and
-         *    clocks out the full frame.
-         */
+        /* 2. Re-arm the DMA immediately — keeping the unarmed window as short
+         *    as possible (just steps 1-2, no printf calls).  The previous RX
+         *    is processed in step 4, after the DMA is already armed again. */
         memset(&trans, 0, sizeof(trans));
-        trans.length    = SPI_LINK_FRAME_SIZE * 8;   /* bits */
+        trans.length    = SPI_LINK_FRAME_SIZE * 8;
         trans.tx_buffer = s_tx_frame;
         trans.rx_buffer = s_rx_frame;
 
-        esp_err_t err = spi_slave_transmit(SPI_HOST, &trans, portMAX_DELAY);
-
-        /*
-         * 3. The frame has been clocked out; our TX data was consumed.
-         *    Lower INT immediately then re-evaluate based on pending queue.
-         */
-        s_queued_frame_has_data = false;
-        update_int();
-
+        esp_err_t err = spi_slave_queue_trans(SPI_HOST, &trans, portMAX_DELAY);
         if (err != ESP_OK) {
-            printf("SpiSlaveLink: transmit error %s\n", esp_err_to_name(err));
+            printf("SpiSlaveLink: queue_trans error %s\n", esp_err_to_name(err));
             vTaskDelay(pdMS_TO_TICKS(5));
+            has_prev_rx = false;
             continue;
         }
 
-        /* 4. Process whatever the CR sent to us. */
-        process_rx_frame();
+        /* 3. DMA armed; raise INT and then process previous RX.
+         *    Any CR transfer that arrives during process_rx_frame hits an
+         *    armed DMA, not an unarmed window. */
+        s_dma_armed = true;
+        update_int();
+
+        if (has_prev_rx) {
+            process_rx_frame(s_rx_copy);
+        }
+
+        /* 4. Block until the current transfer completes. */
+        err = spi_slave_get_trans_result(SPI_HOST, &completed, portMAX_DELAY);
+
+        s_dma_armed = false;
+        s_queued_frame_has_data = false;
+        int_deassert();
+
+        if (err != ESP_OK) {
+            printf("SpiSlaveLink: get_trans_result error %s\n", esp_err_to_name(err));
+            vTaskDelay(pdMS_TO_TICKS(5));
+            has_prev_rx = false;
+            continue;
+        }
+
+        /* 5. Copy RX before the next queue_trans overwrites s_rx_frame. */
+        memcpy(s_rx_copy, s_rx_frame, SPI_LINK_FRAME_SIZE);
+        has_prev_rx = true;
     }
 }
 
@@ -238,9 +278,40 @@ bool SpiSlaveLink_Transmit(const uint8_t *payload, uint16_t len)
         return false;   /* TX queue full */
     }
 
-    /* Signal the CR immediately — the slave task will load the frame on the
-     * next transfer cycle even if it is currently blocked waiting for CS. */
-    int_assert();
+    /* If the DMA is armed (slave_task is in spi_slave_get_trans_result),
+     * raise INT now — the CR needs to know there is data to fetch.
+     * If not armed, slave_task will raise INT after the next queue_trans().
+     * Queue the message BEFORE checking s_dma_armed so we cannot both miss
+     * update_int() inside slave_task AND skip the raise here. */
+    if (s_dma_armed) {
+        update_int();
+    }
+    return true;
+}
+
+bool SpiSlaveLink_Transmit_with_LoggerID(const uint8_t *payload, uint16_t len,uint16_t destLoggerID)
+{
+    if (!payload || len == 0 || len > SPI_LINK_PAYLOAD_MAX) return false;
+
+    SpiLinkMsg_t msg;
+    uint8_t* pBuff = msg.data;
+    pBuff = SerialiseU16(destLoggerID,pBuff);
+    memcpy(pBuff, payload, len);
+    msg.len = len + sizeof(uint16_t);
+
+    DBG("SpiSlaveLink_Transmit_with_LoggerID bytes\r\n");
+    if (g_debug_verbose) {
+        for(uint8_t i = 0;i < msg.len;i++) printf("%02X ", (msg.data)[i]);
+        printf("\r\n");
+    }
+
+    if (xQueueSend(s_tx_queue, &msg, pdMS_TO_TICKS(10)) != pdTRUE) {
+        return false;   /* TX queue full */
+    }
+
+    if (s_dma_armed) {
+        update_int();
+    }
     return true;
 }
 

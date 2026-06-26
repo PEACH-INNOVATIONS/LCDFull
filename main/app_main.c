@@ -18,8 +18,12 @@
 #include "EndPoints.h"
 #include "lcd.h"
 #include "GuiLvgl.h"
+#include "SpiSlaveLink.h"
+#include "DebugConsole.h"
 
 #define MAIN_TASK_STACK   6144
+
+#define PING_PONG_TIMEOUT_ms 1000
 
 static void RegisterCoachingParams(uint16_t loggerID)
 {
@@ -67,11 +71,12 @@ static void SendAllLoggerIDsToCoachRadio(void)
         msg.msgData.loggerIDMessage.loggerID       = GetLoggerIDFromIndex(i);
         msg.msgData.loggerIDMessage.loggerMsgAction = eLoggerMsgAction_Add;
         SendAdminMessageTo(eEntityCoachRadio, &msg, ENDPOINT_LOCAL_SYSTEM);
-        printf("Sent loggerID %u to CR\n", GetLoggerIDFromIndex(i));
+        DBG("Sent loggerID %u to CR\n", GetLoggerIDFromIndex(i));
     }
 }
 
 /* Coach-radio communication state machine (identical to LCD project) */
+/* Deals with the actual readiness of the CD <-> CR link*/
 static void CoachDisplayStateMachine(void)
 {
     typedef enum {
@@ -91,39 +96,39 @@ static void CoachDisplayStateMachine(void)
             state = eState_pinging;
             break;
         case eState_pinging:
-            printf("CDSM: sending ping to CR\r\n");
+            DBG("CDSM: sending ping to CR\r\n");
             SendPingTo(eEntityCoachRadio, ENDPOINT_LOCAL_SYSTEM);
             ping_t = xTaskGetTickCount();
             state = eState_waiting_pong;
             break;
         case eState_waiting_pong:
             if (GetPongReceived()) {
-                printf("CDSM: pong received -> resetting CR\r\n");
+                DBG("CDSM: pong received -> resetting CR\r\n");
                 state = eState_resetting;
-            } else if ((xTaskGetTickCount() - ping_t) >= pdMS_TO_TICKS(10000)) {
-                printf("CDSM: ping timeout, retrying\r\n");
+            } else if ((xTaskGetTickCount() - ping_t) >= pdMS_TO_TICKS(PING_PONG_TIMEOUT_ms)) {
+                DBG("CDSM: ping timeout, retrying\r\n");
                 state = eState_pinging;
             }
             break;
         case eState_resetting:
-            printf("CDSM: sending radio reset\r\n");
+            DBG("CDSM: sending radio reset\r\n");
             SendRatioResetTo(eEntityCoachRadio, ENDPOINT_LOCAL_SYSTEM, eResetAction_Hard);
             state = eState_pinging2;
             break;
         case eState_pinging2:
-            printf("CDSM: sending ping2 to CR (post-reset)\r\n");
+            DBG("CDSM: sending ping2 to CR (post-reset)\r\n");
             SendPingTo(eEntityCoachRadio, ENDPOINT_LOCAL_SYSTEM);
             ping_t = xTaskGetTickCount();
             state = eState_waiting_pong2;
             break;
         case eState_waiting_pong2:
             if (GetPongReceived()) {
-                printf("CDSM: pong2 received -> operating\r\n");
+                DBG("CDSM: pong2 received -> operating\r\n");
                 s_cr_ready = true;
                 SendAllLoggerIDsToCoachRadio();
                 state = eState_operating;
-            } else if ((xTaskGetTickCount() - ping_t) >= pdMS_TO_TICKS(10000)) {
-                printf("CDSM: ping2 timeout, retrying\r\n");
+            } else if ((xTaskGetTickCount() - ping_t) >= pdMS_TO_TICKS(PING_PONG_TIMEOUT_ms)) {
+                DBG("CDSM: ping2 timeout, retrying\r\n");
                 state = eState_pinging2;
             }
             break;
@@ -159,6 +164,8 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+    InitDebugConsole();
+
     /* Hardware + LVGL init (creates LVGL mutex, starts display) */
     LcdLvgl_Init();
 
@@ -167,12 +174,22 @@ void app_main(void)
     if (!InitMessageProcessing()) { printf("InitMessageProcessing failed\n"); return; }
     if (!FileSystemSdInit())      { printf("SD init failed — continuing without config\n"); }
     if (!InitFileConfig())        { printf("FileConfig init failed — using defaults\n"); }
-    if (!InitEPs())               { printf("InitEPs failed\n"); return; }
+    if (!InitEPs())               { printf("InitEPs failed\n"); }
 
+#ifdef CD_DATA_TRANSFER_SPI
+    /* Hand SPI2 from SD card master → SPI slave for the CR link. */
+    FileSystemSdReleaseBus();
+    if (!SpiSlaveLink_Init()) {
+        printf("SpiSlaveLink_Init failed\n");
+        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+#else
     if (!PktParserInit()) {
         printf("PktParserInit failed\n");
         for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
     }
+#endif
+
     if (!PktProcessorInit()) {
         printf("PktProcessorInit failed\n");
         for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
