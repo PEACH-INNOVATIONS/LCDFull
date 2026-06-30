@@ -8,7 +8,7 @@ idf_component_register(
         "PowerLvgl.c"
         "ArcLengthLvgl.c"
         "AccelTimeLvgl.c"
-        "AngleTimeLvgl.c"
+        "FleetViewLvgl.c"
         "CalibLvgl.c"
     INCLUDE_DIRS
         "."

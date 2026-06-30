@@ -39,7 +39,7 @@ add_executable(lcdfull_sim
     ${GUI_DIR}/PowerLvgl.c
     ${GUI_DIR}/ArcLengthLvgl.c
     ${GUI_DIR}/AccelTimeLvgl.c
-    ${GUI_DIR}/AngleTimeLvgl.c
+    ${GUI_DIR}/FleetViewLvgl.c
     ${GUI_DIR}/CalibLvgl.c
     ${GUI_DIR}/GraphConfig.c
 )

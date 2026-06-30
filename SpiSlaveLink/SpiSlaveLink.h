@@ -71,7 +71,7 @@ bool SpiSlaveLink_Init(void);
  * Returns true if the message was accepted into the TX queue.
  */
 bool SpiSlaveLink_Transmit(const uint8_t *payload, uint16_t len);
-bool SpiSlaveLink_Transmit_with_LoggerID(const uint8_t *payload, uint16_t len,uint16_t destLoggerID);
+bool SpiSlaveLink_Transmit_with_RepID(const uint8_t *payload, uint16_t len, uint8_t repID);
 
 /*
  * SpiSlaveLink_GetRxQueue — returns the FreeRTOS queue on which

@@ -15,7 +15,7 @@ extern const tGraphScreenVtable ForceAngleScreen;
 extern const tGraphScreenVtable HandleSpeedScreen;
 extern const tGraphScreenVtable AccelTimeScreen;
 extern const tGraphScreenVtable PowerScreen;
-extern const tGraphScreenVtable AngleTimeScreen;
+extern const tGraphScreenVtable FleetViewScreen;
 extern const tGraphScreenVtable ArcLengthScreen;
 extern const tGraphScreenVtable CalibScreen;
 
@@ -26,7 +26,7 @@ typedef enum {
     eScreen_AccelTime,
     eScreen_Power,
     eScreen_ArcLength,
-    eScreen_AngleTime,
+    eScreen_FleetView,
     eScreen_Calib,
     eScreen_Count
 } eScreenIdx;
@@ -38,7 +38,7 @@ static const tGraphScreenVtable *s_screens[eScreen_Count] = {
     [eScreen_AccelTime]   = &AccelTimeScreen,
     [eScreen_Power]       = &PowerScreen,
     [eScreen_ArcLength]   = &ArcLengthScreen,
-    [eScreen_AngleTime]   = &AngleTimeScreen,
+    [eScreen_FleetView]   = &FleetViewScreen,
     [eScreen_Calib]       = &CalibScreen,
 };
 
@@ -83,6 +83,14 @@ static void gui_periodic_cb(tBoatRadioEP *pEP)
 
 static void gui_stroke_cb(tBoatRadioEP *pEP)
 {
+    /* Fleet View receives stroke events from every endpoint, not just the
+     * selected one, so it can update all boat panels on each stroke. */
+    if (s_cur == eScreen_FleetView) {
+        if (s_screens[s_cur]->on_stroke)
+            s_screens[s_cur]->on_stroke(pEP);
+        return;
+    }
+
     if (pEP != s_sel_ep) return;
 
     /* Debug: print "Drive start sweep" (SIDa 22) for every rower on every

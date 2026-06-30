@@ -289,17 +289,17 @@ bool SpiSlaveLink_Transmit(const uint8_t *payload, uint16_t len)
     return true;
 }
 
-bool SpiSlaveLink_Transmit_with_LoggerID(const uint8_t *payload, uint16_t len,uint16_t destLoggerID)
+bool SpiSlaveLink_Transmit_with_RepID(const uint8_t *payload, uint16_t len, uint8_t repID)
 {
     if (!payload || len == 0 || len > SPI_LINK_PAYLOAD_MAX) return false;
 
     SpiLinkMsg_t msg;
     uint8_t* pBuff = msg.data;
-    pBuff = SerialiseU16(destLoggerID,pBuff);
+    pBuff = SerialiseU8(repID, pBuff);
     memcpy(pBuff, payload, len);
-    msg.len = len + sizeof(uint16_t);
+    msg.len = len + sizeof(uint8_t);
 
-    DBG("SpiSlaveLink_Transmit_with_LoggerID bytes\r\n");
+    DBG("SpiSlaveLink_Transmit_with_RepID repID=%02X\r\n", repID);
     if (g_debug_verbose) {
         for(uint8_t i = 0;i < msg.len;i++) printf("%02X ", (msg.data)[i]);
         printf("\r\n");

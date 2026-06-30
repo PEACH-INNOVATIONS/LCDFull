@@ -25,7 +25,7 @@
 
 #define PING_PONG_TIMEOUT_ms 1000
 
-static void RegisterCoachingParams(uint16_t loggerID)
+void RegisterCoachingParams(uint16_t loggerID)
 {
     /* Periodic seated: sweep angle (2), sweep force (4) */
     static const uint8_t periodicSeatedIDs[] = { eSIDPer_SweepAngle, eSIDPer_SweepForceX,eSIDPer_ScullPortForceX,eSIDPer_ScullStarForceX,9,10};
@@ -61,19 +61,6 @@ static void RegisterCoachingParams(uint16_t loggerID)
 
 static bool s_cr_ready = false;
 bool GetCRReady(void) { return s_cr_ready; }
-
-static void SendAllLoggerIDsToCoachRadio(void)
-{
-    uint8_t n = GetNumValidLoggers();
-    for (uint8_t i = 0; i < n; i++) {
-        tAdminMsgUnion msg = {0};
-        msg.msgType = AdminMsgTypeLoggerID;
-        msg.msgData.loggerIDMessage.loggerID       = GetLoggerIDFromIndex(i);
-        msg.msgData.loggerIDMessage.loggerMsgAction = eLoggerMsgAction_Add;
-        SendAdminMessageTo(eEntityCoachRadio, &msg, ENDPOINT_LOCAL_SYSTEM);
-        DBG("Sent loggerID %u to CR\n", GetLoggerIDFromIndex(i));
-    }
-}
 
 /* Coach-radio communication state machine (identical to LCD project) */
 /* Deals with the actual readiness of the CD <-> CR link*/
@@ -125,7 +112,6 @@ static void CoachDisplayStateMachine(void)
             if (GetPongReceived()) {
                 DBG("CDSM: pong2 received -> operating\r\n");
                 s_cr_ready = true;
-                SendAllLoggerIDsToCoachRadio();
                 state = eState_operating;
             } else if ((xTaskGetTickCount() - ping_t) >= pdMS_TO_TICKS(PING_PONG_TIMEOUT_ms)) {
                 DBG("CDSM: ping2 timeout, retrying\r\n");
@@ -139,10 +125,6 @@ static void CoachDisplayStateMachine(void)
 
 static void MainTask(void *arg)
 {
-    uint8_t n = GetNumValidLoggers();
-    for (uint8_t i = 0; i < n; i++)
-        RegisterCoachingParams(GetLoggerIDFromIndex(i));
-
     GuiLvgl_Start(SD_CARD_MOUNT_POINT);
 
     for (;;) {
